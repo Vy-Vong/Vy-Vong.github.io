@@ -1,14 +1,21 @@
+// ===============================
+// CHIIKAWA NEON BREAKER - CUTE EDITION
+// ===============================
+
 let particles = [];
-let paddle, ball, bricks = [];
-let mode = "cyberpunk";
+let bricks = [];
+let paddle, ball;
+
+let mode = "cute";
 let score = 0;
-let gameState = "play";
+let lives = 3;
+
+let gameState = "menu"; // menu, play, win, lose
 
 let ballImg;
 
-// ---------- RESPONSIVE SYSTEM ----------
+// ---------- RESPONSIVE ----------
 let baseW = 1000;
-let baseH = 600;
 let scaleFactor = 1;
 
 function getCanvasSize() {
@@ -17,22 +24,24 @@ function getCanvasSize() {
   return { w, h };
 }
 
-// ---------- MODES ----------
-const MODES = {
-  cyberpunk: { bg: [10, 5, 20], rain: ["#00f5ff", "#ff2bd6", "#a6ff00"], speed: 2.2, density: 200 },
-  tron: { bg: [5, 10, 20], rain: ["#4df3ff"], speed: 1.5, density: 160 },
-  galaxy: { bg: [15, 0, 25], rain: ["#c77dff", "#ff5ea8", "#6ef7ff"], speed: 1.8, density: 180 }
-};
+// ---------- COLORS ----------
+const PALETTE = [
+  "#ffb6ff",
+  "#b6f7ff",
+  "#fff3b0",
+  "#caffbf",
+  "#ffd6a5"
+];
 
-// ---------- LOAD ----------
+// ---------- PRELOAD ----------
 function preload() {
   ballImg = loadImage("Chiikawa.png");
 }
 
 // ---------- SETUP ----------
 function setup() {
-  let canvasSize = getCanvasSize(); // ✅ FIXED NAME
-  createCanvas(canvasSize.w, canvasSize.h);
+  let s = getCanvasSize();
+  createCanvas(s.w, s.h);
 
   scaleFactor = width / baseW;
 
@@ -42,129 +51,139 @@ function setup() {
   ball = new Ball();
 
   makeBricks();
-  makeRain();
 }
 
 // ---------- DRAW ----------
 function draw() {
-  background(...MODES[mode].bg);
+  background(15, 10, 30);
 
-  // cyber haze
-  for (let i = 0; i < height; i += 25 * scaleFactor) {
-    fill(0, 0, 0, 12);
-    rect(0, i, width, 25 * scaleFactor);
+  // soft glow overlay (no scanlines)
+  fill(255, 255, 255, 3);
+  rect(0, 0, width, height);
+
+  // ---------- MENU ----------
+  if (gameState === "menu") {
+    drawMenu();
+    return;
   }
 
+  // ---------- UPDATE ----------
   if (gameState === "play") {
-    for (let p of particles) {
-      p.update();
-      p.draw();
-      p.hit(paddle);
-    }
-
     paddle.update();
     ball.update();
+
+    particles.forEach(p => p.update());
   }
 
-  // bricks
+  // ---------- DRAW BRICKS ----------
   for (let b of bricks) {
-    if (b.alive) {
-      fill(255, 60, 200);
-      rect(b.x, b.y, b.w, b.h, 3 * scaleFactor);
-    }
+    if (!b.alive) continue;
+
+    fill(random(PALETTE));
+    stroke(255, 120);
+    strokeWeight(1);
+
+    rect(b.x, b.y, b.w, b.h, 6);
   }
 
-  ball.draw();
+  // ---------- DRAW OBJECTS ----------
   paddle.draw();
+  ball.draw();
 
-  // UI
+  particles.forEach(p => p.draw());
+
+  // ---------- UI ----------
+  drawUI();
+
+  // ---------- END STATES ----------
+  if (gameState === "win") drawWin();
+  if (gameState === "lose") drawLose();
+}
+
+// ---------- MENU ----------
+function drawMenu() {
+  textAlign(CENTER);
+
+  fill("#ffb6ff");
+  textSize(42 * scaleFactor);
+  text("CHIIKAWA BREAKER", width / 2, height / 2 - 40);
+
+  fill(255);
+  textSize(16 * scaleFactor);
+  text("press SPACE to start", width / 2, height / 2 + 20);
+}
+
+// ---------- UI ----------
+function drawUI() {
   fill(255);
   textAlign(LEFT);
+
   textSize(14 * scaleFactor);
-  text("mode: " + mode, 20 * scaleFactor, 30 * scaleFactor);
-  text("score: " + score, 20 * scaleFactor, 50 * scaleFactor);
-
-  // WIN
-  if (gameState === "win") {
-    textAlign(CENTER);
-    textSize(40 * scaleFactor);
-    text("YOU WIN", width / 2, height / 2);
-  }
-
-  // LOSE
-  if (gameState === "lose") {
-    textAlign(CENTER);
-
-    textSize(40 * scaleFactor);
-    text("GAME OVER", width / 2, height / 2);
-
-    textSize(16 * scaleFactor);
-    text("press R to restart", width / 2, height / 2 + 40 * scaleFactor);
-  }
+  text("score: " + score, 20, 30);
+  text("lives: " + "♥".repeat(lives), 20, 55);
 }
 
-// ---------- RAIN ----------
-function makeRain() {
-  particles = [];
-  let c = MODES[mode].density;
-
-  for (let i = 0; i < c; i++) {
-    particles.push(new Rain());
-  }
+// ---------- WIN / LOSE ----------
+function drawWin() {
+  textAlign(CENTER);
+  fill("#b6f7ff");
+  textSize(40 * scaleFactor);
+  text("YOU WIN!", width / 2, height / 2);
 }
 
-class Rain {
-  constructor() {
-    this.reset();
-  }
+function drawLose() {
+  textAlign(CENTER);
+  fill("#ffb6ff");
+  textSize(40 * scaleFactor);
+  text("GAME OVER", width / 2, height / 2);
 
-  reset() {
-    this.x = random(width);
-    this.y = random(-height, 0);
-    this.len = random(10, 20) * scaleFactor;
-    this.spd = random(2, 6) * MODES[mode].speed * scaleFactor;
-    this.col = random(MODES[mode].rain);
+  textSize(16 * scaleFactor);
+  fill(255);
+  text("press R to restart", width / 2, height / 2 + 40);
+}
+
+// ---------- PARTICLE ----------
+class Sparkle {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.r = random(2, 5);
+    this.col = random(PALETTE);
+    this.vy = random(-2, 2);
+    this.vx = random(-2, 2);
+    this.life = 60;
   }
 
   update() {
-    this.y += this.spd;
-    if (this.y > height) this.reset();
-  }
-
-  hit(p) {
-    if (
-      this.x > p.x - p.w / 2 &&
-      this.x < p.x + p.w / 2 &&
-      this.y > p.y &&
-      this.y < p.y + p.h
-    ) {
-      this.y = p.y;
-      this.spd *= -0.2;
-    }
+    this.x += this.vx;
+    this.y += this.vy;
+    this.life--;
   }
 
   draw() {
-    stroke(this.col);
-    line(this.x, this.y, this.x, this.y + this.len);
+    noStroke();
+    fill(this.col + "aa");
+    circle(this.x, this.y, this.r);
   }
 }
 
 // ---------- PADDLE ----------
 class Paddle {
   constructor() {
-    this.w = 150 * scaleFactor;
-    this.h = 12 * scaleFactor;
+    this.w = 140 * scaleFactor;
+    this.h = 14 * scaleFactor;
     this.x = width / 2;
-    this.y = height - 80 * scaleFactor;
+    this.y = height - 60 * scaleFactor;
   }
 
   update() {
-    this.x += (mouseX - this.x) * 0.2;
+    this.x += (mouseX - this.x) * 0.15;
   }
 
   draw() {
-    fill(0, 255, 255, 80);
-    rect(this.x - this.w / 2, this.y, this.w, this.h, 8 * scaleFactor);
+    noStroke();
+    fill("#ffb6ff");
+    rect(this.x - this.w / 2, this.y, this.w, this.h, 20);
   }
 }
 
@@ -177,9 +196,9 @@ class Ball {
   reset() {
     this.x = width / 2;
     this.y = height / 2;
-    this.r = 12 * scaleFactor;
-    this.vx = random([-3, 3]) * scaleFactor;
-    this.vy = -4 * scaleFactor;
+    this.r = 14 * scaleFactor;
+    this.vx = random([-3, 3]);
+    this.vy = -4;
   }
 
   update() {
@@ -189,8 +208,8 @@ class Ball {
     if (this.x < 0 || this.x > width) this.vx *= -1;
     if (this.y < 0) this.vy *= -1;
 
+    // paddle
     let p = paddle;
-
     if (
       this.y + this.r > p.y &&
       this.x > p.x - p.w / 2 &&
@@ -198,24 +217,34 @@ class Ball {
     ) {
       this.vy *= -1;
       this.vx += (this.x - p.x) * 0.05;
+
+      particles.push(new Sparkle(this.x, this.y));
     }
 
+    // lose life
     if (this.y > height) {
-      gameState = "lose";
+      lives--;
+
+      if (lives <= 0) {
+        gameState = "lose";
+      } else {
+        this.reset();
+      }
     }
 
+    // bricks
     for (let b of bricks) {
       if (!b.alive) continue;
 
       if (
-        this.x > b.x &&
-        this.x < b.x + b.w &&
-        this.y > b.y &&
-        this.y < b.y + b.h
+        this.x > b.x && this.x < b.x + b.w &&
+        this.y > b.y && this.y < b.y + b.h
       ) {
         b.alive = false;
         this.vy *= -1;
-        score++;
+        score += 10;
+
+        particles.push(new Sparkle(this.x, this.y));
 
         if (bricks.every(bb => !bb.alive)) {
           gameState = "win";
@@ -226,7 +255,7 @@ class Ball {
 
   draw() {
     imageMode(CENTER);
-    image(ballImg, this.x, this.y, this.r * 5, this.r * 5);
+    image(ballImg, this.x, this.y, this.r * 4, this.r * 4);
   }
 }
 
@@ -234,56 +263,54 @@ class Ball {
 function makeBricks() {
   bricks = [];
 
-  for (let x = 20 * scaleFactor; x < width - 40 * scaleFactor; x += 55 * scaleFactor) {
-    for (let y = 40 * scaleFactor; y < 180 * scaleFactor; y += 28 * scaleFactor) {
+  let cols = 10;
+  let rows = 5;
+
+  let pad = 10 * scaleFactor;
+  let w = (width - pad * (cols + 1)) / cols;
+  let h = 20 * scaleFactor;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
       bricks.push({
-        x,
-        y,
-        w: 50 * scaleFactor,
-        h: 20 * scaleFactor,
+        x: pad + c * (w + pad),
+        y: 50 * scaleFactor + r * (h + pad),
+        w,
+        h,
         alive: true
       });
     }
   }
 }
 
-// ---------- CONTROLS ----------
+// ---------- INPUT ----------
 function keyPressed() {
-  if (key === "1") {
-    mode = "cyberpunk";
-    makeRain();
+  if (key === " ") {
+    gameState = "play";
   }
-  if (key === "2") {
-    mode = "tron";
-    makeRain();
-  }
-  if (key === "3") {
-    mode = "galaxy";
-    makeRain();
-  }
+
   if (key === "r") {
     restart();
   }
 }
 
-// ---------- RESTART ----------
 function restart() {
   score = 0;
-  gameState = "play";
+  lives = 3;
+  gameState = "menu";
+
   ball.reset();
   makeBricks();
-  makeRain();
 }
 
 // ---------- RESIZE ----------
 function windowResized() {
-  let canvasSize = getCanvasSize(); // ✅ FIXED HERE TOO
-  resizeCanvas(canvasSize.w, canvasSize.h);
+  let s = getCanvasSize();
+  resizeCanvas(s.w, s.h);
 
   scaleFactor = width / baseW;
 
   paddle = new Paddle();
   ball = new Ball();
   makeBricks();
-  makeRain();
 }
