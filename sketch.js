@@ -6,11 +6,12 @@ let particles = [];
 let bricks = [];
 let paddle, ball;
 
-let mode = "cute";
 let score = 0;
+let level = 1;
 let lives = 3;
 
-let gameState = "menu"; // menu, play, win, lose
+// menu, play, levelComplete, lose
+let gameState = "menu";
 
 let ballImg;
 
@@ -50,53 +51,50 @@ function setup() {
   paddle = new Paddle();
   ball = new Ball();
 
+  startLevel();
+}
+
+// ---------- START LEVEL ----------
+function startLevel() {
   makeBricks();
+  ball.reset();
+  particles = [];
 }
 
 // ---------- DRAW ----------
 function draw() {
   background(15, 10, 30);
 
-  // soft glow overlay (no scanlines)
   fill(255, 255, 255, 3);
   rect(0, 0, width, height);
 
-  // ---------- MENU ----------
   if (gameState === "menu") {
     drawMenu();
     return;
   }
 
-  // ---------- UPDATE ----------
   if (gameState === "play") {
     paddle.update();
     ball.update();
-
     particles.forEach(p => p.update());
   }
 
-  // ---------- DRAW BRICKS ----------
+  // bricks
   for (let b of bricks) {
     if (!b.alive) continue;
 
     fill(random(PALETTE));
     stroke(255, 120);
-    strokeWeight(1);
-
     rect(b.x, b.y, b.w, b.h, 6);
   }
 
-  // ---------- DRAW OBJECTS ----------
   paddle.draw();
   ball.draw();
-
   particles.forEach(p => p.draw());
 
-  // ---------- UI ----------
   drawUI();
 
-  // ---------- END STATES ----------
-  if (gameState === "win") drawWin();
+  if (gameState === "levelComplete") drawLevelComplete();
   if (gameState === "lose") drawLose();
 }
 
@@ -117,28 +115,36 @@ function drawMenu() {
 function drawUI() {
   fill(255);
   textAlign(LEFT);
-
   textSize(14 * scaleFactor);
+
   text("score: " + score, 20, 30);
   text("lives: " + "♥".repeat(lives), 20, 55);
+  text("level: " + level, 20, 80);
 }
 
-// ---------- WIN / LOSE ----------
-function drawWin() {
+// ---------- LEVEL COMPLETE ----------
+function drawLevelComplete() {
   textAlign(CENTER);
+
   fill("#b6f7ff");
-  textSize(40 * scaleFactor);
-  text("YOU WIN!", width / 2, height / 2);
+  textSize(32 * scaleFactor);
+  text("LEVEL " + (level - 1) + " COMPLETE!", width / 2, height / 2 - 20);
+
+  fill(255);
+  textSize(16 * scaleFactor);
+  text("press SPACE for next level", width / 2, height / 2 + 20);
 }
 
+// ---------- LOSE ----------
 function drawLose() {
   textAlign(CENTER);
+
   fill("#ffb6ff");
   textSize(40 * scaleFactor);
   text("GAME OVER", width / 2, height / 2);
 
-  textSize(16 * scaleFactor);
   fill(255);
+  textSize(16 * scaleFactor);
   text("press R to restart", width / 2, height / 2 + 40);
 }
 
@@ -149,8 +155,8 @@ class Sparkle {
     this.y = y;
     this.r = random(2, 5);
     this.col = random(PALETTE);
-    this.vy = random(-2, 2);
     this.vx = random(-2, 2);
+    this.vy = random(-2, 2);
     this.life = 60;
   }
 
@@ -197,8 +203,8 @@ class Ball {
     this.x = width / 2;
     this.y = height / 2;
     this.r = 14 * scaleFactor;
-    this.vx = random([-3, 3]);
-    this.vy = -4;
+    this.vx = random([-3, 3]) * (1 + level * 0.1);
+    this.vy = -4 * (1 + level * 0.05);
   }
 
   update() {
@@ -208,8 +214,8 @@ class Ball {
     if (this.x < 0 || this.x > width) this.vx *= -1;
     if (this.y < 0) this.vy *= -1;
 
-    // paddle
     let p = paddle;
+
     if (
       this.y + this.r > p.y &&
       this.x > p.x - p.w / 2 &&
@@ -217,7 +223,6 @@ class Ball {
     ) {
       this.vy *= -1;
       this.vx += (this.x - p.x) * 0.05;
-
       particles.push(new Sparkle(this.x, this.y));
     }
 
@@ -247,7 +252,7 @@ class Ball {
         particles.push(new Sparkle(this.x, this.y));
 
         if (bricks.every(bb => !bb.alive)) {
-          gameState = "win";
+          gameState = "levelComplete";
         }
       }
     }
@@ -264,7 +269,7 @@ function makeBricks() {
   bricks = [];
 
   let cols = 10;
-  let rows = 5;
+  let rows = 4 + level; // more difficulty per level
 
   let pad = 10 * scaleFactor;
   let w = (width - pad * (cols + 1)) / cols;
@@ -286,7 +291,17 @@ function makeBricks() {
 // ---------- INPUT ----------
 function keyPressed() {
   if (key === " ") {
-    gameState = "play";
+
+    if (gameState === "menu") {
+      gameState = "play";
+      startLevel();
+    }
+
+    else if (gameState === "levelComplete") {
+      level++;
+      gameState = "play";
+      startLevel();
+    }
   }
 
   if (key === "r") {
@@ -296,6 +311,7 @@ function keyPressed() {
 
 function restart() {
   score = 0;
+  level = 1;
   lives = 3;
   gameState = "menu";
 
